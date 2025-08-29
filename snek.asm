@@ -35,7 +35,7 @@ section .bss
 termiosOld: resb 60
 termiosNew: resb 60
 winSizeStruct: resb 8
-numBuf: resb 20
+buf: resb 20
 letterBuf: resb 1
 timespec:
   resq 1
@@ -44,12 +44,22 @@ screenBufPtr: resq 1
 screenBufSize: resq 1
 ROWS: resq 1
 COLS: resq 1
+x: resq 1
+y: resq 1
+xdir: resq 1
+ydir: resq 1
+head: resq 1
+tail: resq 1
+applex: resq 1
+appley: resq 1
+tv: resq 2
+fds: resq 16
 
 section .text
 global _start
 
 printNumber:
-  lea rsi, [numBuf + 19]
+  lea rsi, [buf + 19]
   mov byte [rsi], 0
   mov rbx, 10
   mov rcx, 0
@@ -236,5 +246,24 @@ _start:
   call renderTable
   mov rax, 1
   call sleep
+  
+  mov rax, [COLS]
+  xor rdx, rdx
+  mov rbx, 2
+  div rbx
+  mov [x], rax
+
+  mov rax, [ROWS]
+  xor rdx, rdx
+  mov rbx, 2
+  div rbx
+  mov [y], rax
+
+  mov qword [tail], 0
+  mov qword [head], 0
+  mov qword [xdir], 0
+  mov qword [ydir], 0
+  mov qword [applex], 0
+
   call cleanup
   call exit
