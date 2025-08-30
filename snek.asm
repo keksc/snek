@@ -330,13 +330,13 @@ _start:
   cmp al, 0x1b
   je .exit
   cmp al, 'w'
-  je .printMsg
+  je .mainLoop
   cmp al, 'a'
-  je .printMsg
+  je .mainLoop
   cmp al, 'r'
-  je .printMsg
+  je .mainLoop
   cmp al, 's'
-  je .printMsg
+  je .mainLoop
 
   jmp .mainLoop
 
