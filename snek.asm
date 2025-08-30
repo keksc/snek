@@ -19,6 +19,8 @@ cursorToPos2 db ";"
 cursorToPos2_len equ $ - cursorToPos2
 cursorToPos3 db "H"
 cursorToPos3_len equ $ - cursorToPos3
+gameOverMsg db "Game Over!"
+gameOverMsg_len equ $ - gameOverMsg
 
 section .bss
 termiosOld: resb 60
@@ -35,12 +37,6 @@ ROWS: resq 1
 COLS: resq 1
 x: resq 1
 y: resq 1
-xdir: resq 1
-ydir: resq 1
-head: resq 1
-tail: resq 1
-applex: resq 1
-appley: resq 1
 tv: resq 2
 fds: resq 16
 
@@ -75,7 +71,7 @@ moveCursorTo:
   syscall
 
   ret
-  
+
 printNumber:
   lea rsi, [buf + 19]
   mov byte [rsi], 0
@@ -192,7 +188,7 @@ endGrid:
   stosd
 
   ret
-  
+
 fillGrid:
   mov rdi, [screenBufPtr]
   mov rbx, [COLS]
@@ -220,6 +216,42 @@ fillGrid:
   jnz .fillGridLoop
 
   call endGrid
+
+  ret
+
+genApple:
+  rdtsc
+  shl rdx, 32
+  or rax, rdx ; full 64-bit timestamp into rax
+
+  mov rbx, [COLS]
+  sub rbx, 2
+  xor rdx, rdx
+  div rbx
+  inc rdx
+  mov rcx, rdx
+
+  rdtsc
+  shl rdx, 32
+  or rax, rdx
+
+  mov rbx, [ROWS]
+  sub rbx, 2
+  xor rdx, rdx
+  div rbx
+  inc rdx
+  mov rbx, rdx
+
+  mov rax, rbx
+  mul qword [COLS]
+  add rax, rcx
+  mov rcx, 4
+  mul rcx
+
+  mov rdi, [screenBufPtr]
+  add rdi, rax
+  mov eax, '❤'
+  mov [rdi], eax
 
   ret
 
@@ -262,6 +294,7 @@ sleep:
 _start:
   call init
   call fillGrid
+  call genApple
 
   mov rax, [COLS]
   xor rdx, rdx
@@ -275,22 +308,6 @@ _start:
   div rbx
   mov [y], rax
 
-  mov rdi, [screenBufPtr]
-  mov rax, [y]
-  dec rax
-  mul qword [COLS]
-  add rax, [x]
-  shl rax, 2
-  add rdi, rax
-  mov eax, 'S'
-  stosd
-
-  mov qword [tail], 0
-  mov qword [head], 0
-  mov qword [xdir], 0
-  mov qword [ydir], 0
-  mov qword [applex], 0
-  
 .mainLoop:
   mov rax, WRITE
   mov rdi, STDOUT
@@ -308,7 +325,7 @@ _start:
 
   cmp rax, 1
   jne .mainLoop
-  
+
   mov al, byte [buf]
   cmp al, 0x1b
   je .exit
@@ -326,12 +343,3 @@ _start:
 .exit:
   call cleanup
   call exit
-
-.printMsg:
-  mov rax, WRITE
-  mov rdi, STDOUT
-  lea rsi, [buf]
-  mov rdx, 1
-  syscall
-
-  jmp .mainLoop
