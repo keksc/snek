@@ -1,8 +1,0 @@
-[
-{
-  "directory": "/home/kekw/snek/out/Debug",
-  "command": "/nix/store/bcw9f6r9v2fm3kv7d15fcrya0mf34xds-gcc-wrapper-14.3.0/bin/g++   -g -std=gnu++23 -o CMakeFiles/headers2Asm.dir/headers2Asm.cpp.o -c /home/kekw/snek/headers2Asm.cpp",
-  "file": "/home/kekw/snek/headers2Asm.cpp",
-  "output": "CMakeFiles/headers2Asm.dir/headers2Asm.cpp.o"
-}
-]

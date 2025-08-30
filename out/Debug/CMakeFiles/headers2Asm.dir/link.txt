@@ -1,1 +1,0 @@
-/nix/store/bcw9f6r9v2fm3kv7d15fcrya0mf34xds-gcc-wrapper-14.3.0/bin/g++ -g -Wl,--dependency-file=CMakeFiles/headers2Asm.dir/link.d CMakeFiles/headers2Asm.dir/headers2Asm.cpp.o -o headers2Asm

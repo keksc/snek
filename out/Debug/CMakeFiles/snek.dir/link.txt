@@ -1,1 +1,0 @@
-/nix/store/bcw9f6r9v2fm3kv7d15fcrya0mf34xds-gcc-wrapper-14.3.0/bin/ld CMakeFiles/snek.dir/snek.asm.o CMakeFiles/snek.dir/headers.asm.o -o snek
