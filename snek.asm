@@ -1,25 +1,6 @@
 default rel
 
-%define TCGETS 0x5401
-%define TCSETS 0x5402
-%define TIOCGWINSZ 0x5413
-
-%define WRITE 1
-%define MMAP 9
-%define IOCTL 16
-%define NANOSLEEP 35
-%define EXIT 60
-
-%define PROT_READ 1
-%define PROT_WRITE 2
-%define MAP_PRIVATE 2
-%define MAP_ANONYMOUS 32
-
-%define STDIN 0
-%define STDOUT 1
-%define STDERR 2
-
-%define EXIT_SUCCESS 0
+%include "headers.asm"
 
 section .data
 showCursor db 0x1b, "[?25h"
@@ -34,9 +15,9 @@ cursorToTop db 0x1b, "[H"
 cursorToTop_len equ $ - cursorToTop
 cursorToPos1 db 0x1b, "["
 cursorToPos1_len equ $ - cursorToPos1
-cursorToPos2 db 0x1b, ";"
+cursorToPos2 db ";"
 cursorToPos2_len equ $ - cursorToPos2
-cursorToPos3 db 0x1b, "H"
+cursorToPos3 db "H"
 cursorToPos3_len equ $ - cursorToPos3
 
 section .bss
@@ -67,21 +48,28 @@ section .text
 global _start
 
 moveCursorTo:
+  push rax
+  push rbx
+
   mov rax, WRITE
   mov rdi, STDOUT
   lea rsi, [cursorToPos1]
   mov rdx, cursorToPos1_len
   syscall
 
+  pop rax
+
   call printNumber
 
+  mov rax, WRITE
   lea rsi, [cursorToPos2]
   mov rdx, cursorToPos2_len
   syscall
 
-  mov rax, rbx
+  pop rax
   call printNumber
 
+  mov rax, WRITE
   lea rsi, [cursorToPos3]
   mov rdx, cursorToPos3_len
   syscall
@@ -92,7 +80,7 @@ printNumber:
   lea rsi, [buf + 19]
   mov byte [rsi], 0
   mov rbx, 10
-  mov rcx, 0
+  xor rcx, rcx
   test rax, rax
   jnz .convert_loop
   dec rsi
@@ -136,10 +124,7 @@ init:
   dec rcx
   jnz .copyLoop
 
-  lea rdi, [termiosNew + 12]
-  mov rax, [rdi]
-  and rax, 0xfffffffffffffeF5
-  mov [rdi], rax
+  and word [termiosNew + TERMIOS_C_LFLAG_OFFSET], ~(TERMIOS_ICANON | TERMIOS_ECHO)
 
   mov rax, IOCTL
   mov rdi, STDIN
@@ -153,17 +138,19 @@ init:
   lea rdx, [winSizeStruct]
   syscall
 
-  movzx rax, word [winSizeStruct]      ; rows
-  movzx rbx, word [winSizeStruct+2]    ; cols
+  movzx rax, word [winSizeStruct + WINSIZE_ROWS_OFFSET]
+  movzx rbx, word [winSizeStruct + WINSIZE_COLS_OFFSET]
   mov [ROWS], rax
   mov [COLS], rbx
 
-  imul rax, rbx
-  imul rax, 4
+  mul rbx
+  mov rbx, 4
+  mul rbx
   mov [screenBufSize], rax
 
   xor rdi, rdi
-  mov rsi, [screenBufSize]
+  mov rsi, rax
+  sub rsi, 90
   mov rdx, PROT_READ | PROT_WRITE
   mov r10, MAP_PRIVATE | MAP_ANONYMOUS
   mov r8, -1
@@ -291,7 +278,7 @@ _start:
   mov rdi, [screenBufPtr]
   mov rax, [y]
   dec rax
-  imul rax, [COLS]
+  mul qword [COLS]
   add rax, [x]
   shl rax, 2
   add rdi, rax
@@ -304,15 +291,15 @@ _start:
   mov qword [ydir], 0
   mov qword [applex], 0
   
-  call renderTable
-
+.mainLoop:
   mov rax, WRITE
   mov rdi, STDOUT
   lea rsi, [cursorToTop]
   mov rdx, cursorToTop_len
   syscall
 
-.mainLoop:
+  call renderTable
+
   mov rax, 0
   mov rdi, STDIN
   lea rsi, [buf]

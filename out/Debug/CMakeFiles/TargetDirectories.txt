@@ -1,0 +1,4 @@
+/home/kekw/snek/out/Debug/CMakeFiles/headers2Asm.dir
+/home/kekw/snek/out/Debug/CMakeFiles/snek.dir
+/home/kekw/snek/out/Debug/CMakeFiles/edit_cache.dir
+/home/kekw/snek/out/Debug/CMakeFiles/rebuild_cache.dir

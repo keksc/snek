@@ -1,0 +1,70 @@
+{
+	"cmake" : 
+	{
+		"generator" : 
+		{
+			"multiConfig" : false,
+			"name" : "Unix Makefiles"
+		},
+		"paths" : 
+		{
+			"cmake" : "/nix/store/0vnarm4qjnj16dr3zj9kwq6bn79c0icn-cmake-3.31.7/bin/cmake",
+			"cpack" : "/nix/store/0vnarm4qjnj16dr3zj9kwq6bn79c0icn-cmake-3.31.7/bin/cpack",
+			"ctest" : "/nix/store/0vnarm4qjnj16dr3zj9kwq6bn79c0icn-cmake-3.31.7/bin/ctest",
+			"root" : "/nix/store/0vnarm4qjnj16dr3zj9kwq6bn79c0icn-cmake-3.31.7/share/cmake-3.31"
+		},
+		"version" : 
+		{
+			"isDirty" : false,
+			"major" : 3,
+			"minor" : 31,
+			"patch" : 7,
+			"string" : "3.31.7",
+			"suffix" : ""
+		}
+	},
+	"objects" : 
+	[
+		{
+			"jsonFile" : "codemodel-v2-66548853ad80cf75bd2f.json",
+			"kind" : "codemodel",
+			"version" : 
+			{
+				"major" : 2,
+				"minor" : 7
+			}
+		},
+		{
+			"jsonFile" : "cmakeFiles-v1-52c787025e91a7570176.json",
+			"kind" : "cmakeFiles",
+			"version" : 
+			{
+				"major" : 1,
+				"minor" : 1
+			}
+		}
+	],
+	"reply" : 
+	{
+		"cmakeFiles-v1" : 
+		{
+			"jsonFile" : "cmakeFiles-v1-52c787025e91a7570176.json",
+			"kind" : "cmakeFiles",
+			"version" : 
+			{
+				"major" : 1,
+				"minor" : 1
+			}
+		},
+		"codemodel-v2" : 
+		{
+			"jsonFile" : "codemodel-v2-66548853ad80cf75bd2f.json",
+			"kind" : "codemodel",
+			"version" : 
+			{
+				"major" : 2,
+				"minor" : 7
+			}
+		}
+	}
+}
