@@ -1,3 +1,5 @@
+default rel
+
 %define TCGETS 0x5401
 %define TCSETS 0x5402
 %define TIOCGWINSZ 0x5413
@@ -30,6 +32,12 @@ disableAltScreen db 0x1b, "[?1049l"
 disableAltScreen_len equ $ - disableAltScreen
 cursorToTop db 0x1b, "[H"
 cursorToTop_len equ $ - cursorToTop
+cursorToPos1 db 0x1b, "["
+cursorToPos1_len equ $ - cursorToPos1
+cursorToPos2 db 0x1b, ";"
+cursorToPos2_len equ $ - cursorToPos2
+cursorToPos3 db 0x1b, "H"
+cursorToPos3_len equ $ - cursorToPos3
 
 section .bss
 termiosOld: resb 60
@@ -58,6 +66,28 @@ fds: resq 16
 section .text
 global _start
 
+moveCursorTo:
+  mov rax, WRITE
+  mov rdi, STDOUT
+  lea rsi, [cursorToPos1]
+  mov rdx, cursorToPos1_len
+  syscall
+
+  call printNumber
+
+  lea rsi, [cursorToPos2]
+  mov rdx, cursorToPos2_len
+  syscall
+
+  mov rax, rbx
+  call printNumber
+
+  lea rsi, [cursorToPos3]
+  mov rdx, cursorToPos3_len
+  syscall
+
+  ret
+  
 printNumber:
   lea rsi, [buf + 19]
   mov byte [rsi], 0
@@ -85,17 +115,18 @@ printNumber:
   mov rdi, STDOUT
   mov rdx, rcx
   syscall
+
   ret
 
 init:
   mov rax, IOCTL
   mov rdi, STDIN
   mov rsi, TCGETS
-  lea rdx, [rel termiosOld]
+  lea rdx, [termiosOld]
   syscall
 
-  lea rsi, [rel termiosOld]
-  lea rdi, [rel termiosNew]
+  lea rsi, [termiosOld]
+  lea rdi, [termiosNew]
   mov rcx, 60
 .copyLoop:
   mov al, [rsi]
@@ -105,7 +136,7 @@ init:
   dec rcx
   jnz .copyLoop
 
-  lea rdi, [rel termiosNew + 12]
+  lea rdi, [termiosNew + 12]
   mov rax, [rdi]
   and rax, 0xfffffffffffffeF5
   mov [rdi], rax
@@ -113,13 +144,13 @@ init:
   mov rax, IOCTL
   mov rdi, STDIN
   mov rsi, TCSETS
-  lea rdx, [rel termiosNew]
+  lea rdx, [termiosNew]
   syscall
 
   mov rax, IOCTL
   mov rdi, STDIN
   mov rsi, TIOCGWINSZ
-  lea rdx, [rel winSizeStruct]
+  lea rdx, [winSizeStruct]
   syscall
 
   movzx rax, word [winSizeStruct]      ; rows
@@ -143,7 +174,7 @@ init:
 
   mov rax, WRITE
   mov rdi, STDOUT
-  lea rsi, [rel enableAltScreen]
+  lea rsi, [enableAltScreen]
   mov rdx, enableAltScreen_len
   syscall
 
@@ -211,19 +242,20 @@ renderTable:
   mov rsi, [screenBufPtr]
   mov rdx, [screenBufSize]
   syscall
+
   ret
 
 cleanup:
   mov rax, WRITE
   mov rdi, STDOUT
-  lea rsi, [rel disableAltScreen]
+  lea rsi, [disableAltScreen]
   mov rdx, disableAltScreen_len
   syscall
 
   mov rax, IOCTL
   mov rdi, STDIN
   mov rsi, TCSETS
-  lea rdx, [rel termiosOld]
+  lea rdx, [termiosOld]
   syscall
   ret
 
@@ -235,7 +267,7 @@ exit:
 sleep:
   mov [timespec], rax
   mov rax, NANOSLEEP
-  lea rdi, [rel timespec]
+  lea rdi, [timespec]
   xor rsi, rsi
   syscall
   ret
@@ -243,10 +275,7 @@ sleep:
 _start:
   call init
   call fillGrid
-  call renderTable
-  mov rax, 1
-  call sleep
-  
+
   mov rax, [COLS]
   xor rdx, rdx
   mov rbx, 2
@@ -259,11 +288,63 @@ _start:
   div rbx
   mov [y], rax
 
+  mov rdi, [screenBufPtr]
+  mov rax, [y]
+  dec rax
+  imul rax, [COLS]
+  add rax, [x]
+  shl rax, 2
+  add rdi, rax
+  mov eax, 'S'
+  stosd
+
   mov qword [tail], 0
   mov qword [head], 0
   mov qword [xdir], 0
   mov qword [ydir], 0
   mov qword [applex], 0
+  
+  call renderTable
 
+  mov rax, WRITE
+  mov rdi, STDOUT
+  lea rsi, [cursorToTop]
+  mov rdx, cursorToTop_len
+  syscall
+
+.mainLoop:
+  mov rax, 0
+  mov rdi, STDIN
+  lea rsi, [buf]
+  mov rdx, 1
+  syscall
+
+  cmp rax, 1
+  jne .mainLoop
+  
+  mov al, byte [buf]
+  cmp al, 0x1b
+  je .exit
+  cmp al, 'w'
+  je .printMsg
+  cmp al, 'a'
+  je .printMsg
+  cmp al, 'r'
+  je .printMsg
+  cmp al, 's'
+  je .printMsg
+
+  jmp .mainLoop
+
+.exit:
   call cleanup
   call exit
+
+.printMsg:
+  mov rax, WRITE
+  mov rdi, STDOUT
+  lea rsi, [buf]
+  mov rdx, 1
+  syscall
+
+  jmp .mainLoop
