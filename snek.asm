@@ -1,5 +1,3 @@
-default rel
-
 %include "headers.asm"
 
 section .data
@@ -37,8 +35,7 @@ ROWS: resq 1
 COLS: resq 1
 x: resq 1
 y: resq 1
-tv: resq 2
-fds: resq 16
+pollfd: resb 8  ; Structure for poll: fd (4 bytes), events (2 bytes), revents (2 bytes)
 
 section .text
 global _start
@@ -54,7 +51,6 @@ moveCursorTo:
   syscall
 
   pop rax
-
   call printNumber
 
   mov rax, WRITE
@@ -161,6 +157,12 @@ init:
   mov rdx, enableAltScreen_len
   syscall
 
+  mov rax, WRITE
+  mov rdi, STDOUT
+  lea rsi, [hideCursor]
+  mov rdx, hideCursor_len
+  syscall
+
   ret
 
 beginGrid:
@@ -201,7 +203,6 @@ fillGrid:
   call beginGrid
 
   mov rcx, rdx
-
 .fillGridLoop:
   push rcx
   mov eax, '│'
@@ -222,7 +223,7 @@ fillGrid:
 genApple:
   rdtsc
   shl rdx, 32
-  or rax, rdx ; full 64-bit timestamp into rax
+  or rax, rdx
 
   mov rbx, [COLS]
   sub rbx, 2
@@ -271,6 +272,12 @@ cleanup:
   mov rdx, disableAltScreen_len
   syscall
 
+  mov rax, WRITE
+  mov rdi, STDOUT
+  lea rsi, [showCursor]
+  mov rdx, showCursor_len
+  syscall
+
   mov rax, IOCTL
   mov rdi, STDIN
   mov rsi, TCSETS
@@ -291,22 +298,45 @@ sleep:
   syscall
   ret
 
+getOffset:
+  xchg rax, rbx
+  mul qword [COLS]
+  add rax, rbx
+  shl rax, 2
+
+  ret
+
+setCurrentCharacter:
+  push rax
+
+  mov rax, [x]
+  mov rbx, [y]
+  call getOffset
+  mov rdi, [screenBufPtr]
+  add rdi, rax
+  pop rax
+  mov [rdi], eax
+  
+  ret
+
 _start:
   call init
   call fillGrid
   call genApple
 
   mov rax, [COLS]
-  xor rdx, rdx
-  mov rbx, 2
-  div rbx
+  shr rax, 1
   mov [x], rax
+  mov rbx, [ROWS]
+  shr rbx, 1
+  mov [y], rbx
 
-  mov rax, [ROWS]
-  xor rdx, rdx
-  mov rbx, 2
-  div rbx
-  mov [y], rax
+  call getOffset
+
+  mov rdi, [screenBufPtr]
+  add rdi, rax
+  mov eax, '▓'
+  mov [rdi], eax
 
 .mainLoop:
   mov rax, WRITE
@@ -317,27 +347,134 @@ _start:
 
   call renderTable
 
+  ; Set up pollfd structure for non-blocking input check
+  mov dword [pollfd], STDIN
+  mov word [pollfd + 4], POLL_IN
+  mov word [pollfd + 6], 0      ; revents = 0
+
+  mov rax, POLL
+  lea rdi, [pollfd]
+  mov rsi, 1
+  mov rdx, 0
+  syscall
+
+  cmp rax, 0
+  jle .mainLoop
+
+  ; Read 1 byte initially
   mov rax, 0
   mov rdi, STDIN
   lea rsi, [buf]
   mov rdx, 1
   syscall
 
-  cmp rax, 1
+  cmp rax, 0
+  je .mainLoop
+
+  cmp byte [buf], 0x1b
+  je .checkEscape
+
+  ; Handle single-character inputs
+  mov al, [buf]
+  cmp al, 'w'
+  je .up
+  cmp al, 'a'
+  je .left
+  cmp al, 'r'
+  je .down
+  cmp al, 's'
+  je .right
+  cmp al, 'q'
+  je .exit
+
+  jmp .mainLoop
+
+.checkEscape:
+  ; Check if more input is available
+  mov dword [pollfd], STDIN
+  mov word [pollfd + 4], POLL_IN
+  mov word [pollfd + 6], 0
+
+  mov rax, 7
+  lea rdi, [pollfd]
+  mov rsi, 1
+  mov rdx, 0
+  syscall
+
+  cmp rax, 0
+  jle .exit
+
+  ; Read up to 2 more bytes
+  mov rax, 0
+  mov rdi, STDIN
+  lea rsi, [buf + 1]
+  mov rdx, 2
+  syscall
+
+  cmp rax, 0
+  je .exit
+
+  cmp byte [buf + 1], '['
+  jne .exit
+
+  cmp rax, 2
   jne .mainLoop
 
-  mov al, byte [buf]
-  cmp al, 0x1b
-  je .exit
-  cmp al, 'w'
-  je .mainLoop
-  cmp al, 'a'
-  je .mainLoop
-  cmp al, 'r'
-  je .mainLoop
-  cmp al, 's'
-  je .mainLoop
+  cmp byte [buf + 2], 'A' ; Up arrow
+  je .up
+  cmp byte [buf + 2], 'B' ; Down arrow
+  je .down
+  cmp byte [buf + 2], 'C' ; Right arrow
+  je .right
+  cmp byte [buf + 2], 'D' ; Left arrow
+  je .left
 
+  jmp .mainLoop
+
+.up:
+  mov rax, [y]
+  cmp rax, 1          ; Check if y > 1 (top border)
+  jle .mainLoop       ; Skip if at or above top border
+  mov eax, '·'
+  call setCurrentCharacter
+  dec qword [y]
+  mov eax, '▓'
+  call setCurrentCharacter
+  jmp .mainLoop
+
+.down:
+  mov rax, [ROWS]
+  sub rax, 2          ; ROWS-2 is the bottom border
+  cmp [y], rax
+  jge .mainLoop       ; Skip if at or below bottom border
+  mov eax, '·'
+  call setCurrentCharacter
+  inc qword [y]
+  mov eax, '▓'
+  call setCurrentCharacter
+  jmp .mainLoop
+
+.left:
+  mov rax, [x]
+  cmp rax, 1          ; Check if x > 1 (left border)
+  jle .mainLoop       ; Skip if at or left of left border
+  mov eax, '·'
+  call setCurrentCharacter
+  dec qword [x]
+  mov eax, '▓'
+  call setCurrentCharacter
+  jmp .mainLoop
+
+.right:
+  mov rax, [COLS]
+  sub rax, 2          ; COLS-2 is the right border
+  cmp [x], rax
+  jge .mainLoop       ; Skip if at or right of right border
+  mov eax, '·'
+  call setCurrentCharacter
+  inc qword [x]
+  mov eax, '▓'
+  call setCurrentCharacter
   jmp .mainLoop
 
 .exit:
